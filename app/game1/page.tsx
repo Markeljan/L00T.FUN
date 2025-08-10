@@ -10,7 +10,6 @@ import {
   Trophy,
   Volume2,
   VolumeX,
-  Wallet,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -19,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import WalletConnect from "@/components/WalletConnect";
 import { cn } from "@/lib/utils";
 
 type Result = {
@@ -72,13 +72,7 @@ function Header() {
         </span>
       </div>
       <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          className="bg-[#0000FF] hover:bg-[#0000E0] text-white"
-        >
-          <Wallet className="mr-2 size-4" />
-          Connect
-        </Button>
+        <WalletConnect className="z-10" />
         <Button
           size="icon"
           variant="outline"

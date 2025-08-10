@@ -2,18 +2,19 @@
 
 import {
   Coins,
+  DollarSign,
   HelpCircle,
   PartyPopper,
   Rocket,
-  RotateCw,
-  Swords,
-  Timer,
-  Trophy,
   Volume2,
   VolumeX,
-  Wallet,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Token,
+  TokenStreamProvider,
+  useTokenStream,
+} from "@/components/token-stream";
 import {
   Accordion,
   AccordionContent,
@@ -32,9 +33,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import WalletConnect from "@/components/WalletConnect";
 import { cn } from "@/lib/utils";
-
-type Phase = "idle" | "spinning" | "bust" | "won";
 
 const COLORS = {
   baseBlue: "#0000FF",
@@ -48,12 +48,13 @@ const COLORS = {
 export default function Page() {
   return (
     <main className="min-h-dvh w-full" style={{ backgroundColor: COLORS.bg }}>
-      <div className="mx-auto max-w-screen-md px-3 pb-28 pt-3 sm:pt-6">
-        <Header />
-        <Ticker />
-        <Game />
-      </div>
-      <BottomDock />
+      <TokenStreamProvider>
+        <div className="mx-auto max-w-screen-lg px-3 pb-28 pt-3 sm:pt-6">
+          <Header />
+          <PulseGame />
+        </div>
+        <BottomDock />
+      </TokenStreamProvider>
     </main>
   );
 }
@@ -61,21 +62,16 @@ export default function Page() {
 function Header() {
   const [muted, setMuted] = useState(true);
   return (
-    <header className="mb-3 flex items-center justify-between">
+    <header className="mb-4 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <div
           aria-hidden
-          className="grid size-7 grid-cols-2 gap-0.5 rounded-sm"
-          style={{ filter: `drop-shadow(0 0 12px ${COLORS.baseBlue})` }}
-        >
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-sm"
-              style={{ backgroundColor: COLORS.baseBlue }}
-            />
-          ))}
-        </div>
+          className="size-7 rounded-sm"
+          style={{
+            backgroundColor: COLORS.baseBlue,
+            boxShadow: `0 0 16px ${COLORS.baseBlue}`,
+          }}
+        />
         <span className="text-lg font-semibold tracking-wide text-white/90">
           L00T.fun
         </span>
@@ -93,14 +89,7 @@ function Header() {
           </DialogTrigger>
           <HowToPlay />
         </Dialog>
-        <Button
-          size="sm"
-          onClick={() => {}}
-          className="bg-[#0000FF] text-white hover:bg-[#0000E0]"
-        >
-          <Wallet className="mr-2 size-4" />
-          Connect
-        </Button>
+        <WalletConnect className="z-10" />
         <Button
           size="icon"
           variant="outline"
@@ -124,32 +113,24 @@ function HowToPlay() {
     <DialogContent className="max-w-md border-white/10 bg-black text-white">
       <DialogHeader>
         <DialogTitle className="text-center text-xl">
-          How to Play — Orbital Lock
+          How to Play — Base Pulse
         </DialogTitle>
       </DialogHeader>
       <ol className="list-decimal space-y-2 pl-5 text-sm text-[#c0f28a]">
-        <li>Place your stake in ETH</li>
-        <li>Tap Start to begin the round</li>
-        <li>Press Lock when the rotating marker is inside the blue safe arc</li>
-        <li>Each success shrinks the arc and increases your multiplier</li>
-        <li>Miss the arc and you bust to 0</li>
-        <li>Cash out anytime to secure your payout</li>
+        <li>Pick any token from the stream</li>
+        <li>Set your stake and press Start Ride</li>
+        <li>Watch the live pulse for 20 seconds</li>
+        <li>Tap Sell anytime to lock your payout</li>
+        <li>If the token drops −35% from entry, it rugs and you lose</li>
+        <li>House edge 3% applied on cash out</li>
       </ol>
       <Accordion type="single" collapsible className="mt-3">
         <AccordionItem value="fair">
           <AccordionTrigger className="text-sm">Provably Fair</AccordionTrigger>
           <AccordionContent className="text-sm text-white/70">
-            Results will be generated on Base using verifiable randomness. Demo
-            uses client simulation. House edge 3%.
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="multiplier">
-          <AccordionTrigger className="text-sm">
-            Multiplier Growth
-          </AccordionTrigger>
-          <AccordionContent className="text-sm text-white/70">
-            Smaller safe arcs pay more. Your multiplier scales each round:
-            higher risk, higher reward. Legendary runs glow gold.
+            Token updates will stream from Base (webhooks/SSE). This demo
+            simulates real-time prices. Settlements are instant onchain with a
+            transparent 3% fee.
           </AccordionContent>
         </AccordionItem>
         <AccordionItem value="responsible">
@@ -157,8 +138,8 @@ function HowToPlay() {
             Responsible Gaming
           </AccordionTrigger>
           <AccordionContent className="text-sm text-white/70">
-            Set max loss limits, session reminders, and self-exclusion in
-            Settings. Take breaks every 50 rounds.
+            Set loss limits, session timers, and self-exclusion in Settings. A
+            break reminder appears after 50 rounds.
           </AccordionContent>
         </AccordionItem>
       </Accordion>
@@ -166,267 +147,377 @@ function HowToPlay() {
   );
 }
 
-function Ticker() {
-  const [items, setItems] = useState<string[]>(() =>
-    Array.from({ length: 10 }, () => makeEvent()),
-  );
+/**
+ * Main Game — not competitive. You vs. the pulse.
+ */
+function PulseGame() {
+  const { tokens } = useTokenStream();
+  const [activeId, setActiveId] = useState(tokens[0]?.id ?? "WIF");
   useEffect(() => {
-    const id = setInterval(() => {
-      setItems((list) => [makeEvent(), ...list].slice(0, 24));
-    }, 3500);
-    return () => clearInterval(id);
-  }, []);
+    if (!tokens.find((t) => t.id === activeId))
+      setActiveId(tokens[0]?.id ?? "WIF");
+  }, [tokens, activeId]);
+
   return (
-    <div className="relative mb-3 overflow-hidden rounded-lg border border-white/10 bg-white/5">
-      <div className="flex animate-[marquee_28s_linear_infinite] gap-8 whitespace-nowrap px-4 py-2 text-sm text-white/80">
-        {items.map((item) => (
-          <span
-            key={`event-${item}`}
-            className="inline-flex items-center gap-2"
-          >
-            <Trophy className="size-3.5 text-[#FFD12F]" />
-            {item}
-          </span>
-        ))}
-      </div>
-      <style jsx>{`
-        @keyframes marquee {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-      `}</style>
+    <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+      <RidePanel tokenId={activeId} />
+      <HotTokensList activeId={activeId} onPick={setActiveId} />
     </div>
   );
 }
 
-function makeEvent() {
-  const addr = `0x${Math.random().toString(16).slice(2, 6)}…${Math.random().toString(16).slice(2, 6)}`;
-  const m = (
-    Math.random() < 0.85 ? 1 + Math.random() * 3 : 5 + Math.random() * 50
-  ).toFixed(2);
-  const stake = [0.005, 0.01, 0.025, 0.05][Math.floor(Math.random() * 4)];
-  return `${addr} cashed out ${m}x on ${stake} ETH`;
-}
-
-function Game() {
-  const [stake, setStake] = useState(0.01);
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [round, setRound] = useState(0);
-  const [mult, setMult] = useState(1);
-  const [nearMiss, setNearMiss] = useState<string | null>(null);
-  const [pnl, setPnl] = useState(0);
-  const [plays, setPlays] = useState(0);
-  const [showBreak, setShowBreak] = useState(false);
-  const [auto, setAuto] = useState(false);
-  const [lossLimit, setLossLimit] = useState(-0.25);
-
-  const onCashOut = useCallback(() => {
-    if (phase !== "spinning" && phase !== "won") return;
-    const payout = stake * mult;
-    setPnl((b) => Number((b - stake + payout).toFixed(6)));
-    setPhase("won");
-  }, [phase, stake, mult]);
-
-  const onStart = useCallback(() => {
-    if (plays >= 50 && !showBreak) {
-      setShowBreak(true);
-      return;
-    }
-    setNearMiss(null);
-    setMult(1);
-    setRound(1);
-    setPhase("spinning");
-    setPlays((n) => n + 1);
-  }, [plays, showBreak]);
-
-  const onNextRound = useCallback(
-    (outcome: "success" | "bust" | "near") => {
-      if (outcome === "success") {
-        setRound((r) => r + 1);
-        setMult((m) => Number((m * 1.0).toFixed(4))); // multiplier updated by canvas callback
-      } else if (outcome === "bust") {
-        setPhase("bust");
-        setPnl((b) => Number((b - stake).toFixed(6)));
-      } else {
-        setNearMiss("So close to a Legendary lock!");
-      }
-    },
-    [stake],
-  );
-
+function HotTokensList({
+  activeId,
+  onPick,
+}: {
+  activeId: string;
+  onPick: (id: string) => void;
+}) {
+  const { tokens } = useTokenStream();
   return (
-    <section aria-label="Orbital Lock">
-      <Card className="border-white/10 bg-white/5 text-white">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between text-sm text-white/70">
-            <span>Instant onchain loot. Built on Base.</span>
-            <div className="flex items-center gap-3">
-              <Badge label="House edge 3%" color="info" />
-              <Badge label={`Round ${Math.max(round, 0)}`} color="neutral" />
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <MultiplierReadout mult={mult} phase={phase} stake={stake} />
-          <OrbitalLockCanvas
-            phase={phase}
-            setPhase={setPhase}
-            round={round}
-            setRound={setRound}
-            mult={mult}
-            setMult={setMult}
-            onOutcome={onNextRound}
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            {phase === "spinning" ? (
-              <>
-                <Button
-                  className="h-12 w-full bg-[#0000FF] text-white hover:bg-[#0000E0]"
-                  onClick={() =>
-                    document.dispatchEvent(new CustomEvent("orbital-lock"))
-                  }
-                >
-                  <Swords className="mr-2 size-4" />
-                  Lock
-                </Button>
-                <Button
-                  variant="secondary"
-                  className="h-12 w-full bg-white text-black hover:bg-white/90"
-                  onClick={onCashOut}
-                >
-                  Cash out
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  className="h-12 w-full bg-[#0000FF] text-white hover:bg-[#0000E0]"
-                  onClick={onStart}
-                >
-                  <Rocket className="mr-2 size-4" />
-                  Start
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-12 w-full border-white/15 bg-white/5 text-white hover:bg-white/10"
-                  onClick={() => {
-                    setPhase("idle");
-                    setMult(1);
-                    setRound(0);
-                    setNearMiss(null);
-                  }}
-                >
-                  <RotateCw className="mr-2 size-4" />
-                  Reset
-                </Button>
-              </>
+    <Card className="border-white/10 bg-white/5 text-white">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm text-white/70">
+          Hot Tokens (simulated)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        {tokens.map((t) => (
+          <button
+            type="button"
+            key={t.id}
+            className={cn(
+              "flex items-center justify-between rounded-md border px-3 py-2 text-left",
+              "hover:bg-white/10 transition-colors",
+              activeId === t.id
+                ? "border-[#0000FF] bg-white/10"
+                : "border-white/10 bg-white/5",
             )}
-          </div>
-
-          <StakeControls stake={stake} onChange={setStake} />
-
-          <Separator className="bg-white/10" />
-          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-            <div className="text-white/70">
-              Session P&amp;L:{" "}
-              <span
+            onClick={() => onPick(t.id)}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="size-8 rounded-md"
+                style={{ backgroundColor: t.color }}
+              />
+              <div>
+                <div className="text-sm font-semibold">{t.symbol}</div>
+                <div className="text-[11px] text-white/60">{t.name}</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div
                 className={cn(
-                  "font-semibold",
-                  pnl >= 0 ? "text-[#66C800]" : "text-[#FC401F]",
+                  "text-sm font-semibold",
+                  t.change1m >= 0 ? "text-[#66C800]" : "text-[#FC401F]",
                 )}
               >
-                {pnl >= 0 ? "+" : ""}
-                {pnl.toFixed(4)} ETH
-              </span>
+                {t.change1m >= 0 ? "+" : ""}
+                {t.change1m.toFixed(1)}%
+              </div>
+              <div className="text-[11px] text-white/50">
+                {t.price.toFixed(3)}
+              </div>
             </div>
-            <div className="flex items-center gap-4">
-              <label
-                htmlFor="auto-next-round"
-                className="flex items-center gap-2 text-white/80"
-              >
-                <Switch checked={auto} onCheckedChange={setAuto} />
-                Auto next round
-              </label>
-              <LossLimit value={lossLimit} onChange={setLossLimit} />
-            </div>
-          </div>
-
-          {nearMiss && (
-            <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
-              {nearMiss}
-            </div>
-          )}
-          {phase === "bust" && <LoseBar />}
-          {phase === "won" && <WinBar payout={stake * mult} />}
-          {showBreak && (
-            <BreakNotice dismiss={() => setShowBreak(false)} plays={plays} />
-          )}
-        </CardContent>
-      </Card>
-    </section>
+          </button>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
-function MultiplierReadout({
+type Phase = "idle" | "riding" | "bust" | "won" | "settled";
+
+function RidePanel({ tokenId }: { tokenId: string }) {
+  const { getToken } = useTokenStream();
+  const token: Token = getToken(tokenId) ?? {
+    id: "-",
+    symbol: "-",
+    name: "-",
+    color: "#ffffff",
+    price: 0,
+    change1m: 0,
+    change5s: 0,
+    volume: 0,
+  };
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [stake, setStake] = useState(0.01);
+  const [entry, setEntry] = useState(token.price);
+  const [timer, setTimer] = useState(20);
+  const [pnl, setPnl] = useState(0);
+  const [plays, setPlays] = useState(0);
+  const [nearMiss, setNearMiss] = useState<string | null>(null);
+
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Keep entry aligned to token when starting
+  useEffect(() => {
+    if (phase === "idle") setEntry(token.price);
+  }, [token.price, phase]);
+
+  // Countdown manager
+  useEffect(() => {
+    if (phase !== "riding") return;
+    setTimer(20);
+    intervalRef.current && clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setTimer((t) => {
+        if (t <= 1) {
+          intervalRef.current && clearInterval(intervalRef.current);
+          sell("time");
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+    // biome-ignore lint/correctness/useExhaustiveDependencies: yolo
+  }, [phase, sell]);
+
+  // Bust line watcher
+  useEffect(() => {
+    if (phase !== "riding") return;
+    const drawdown = (token.price / entry - 1) * 100;
+    if (drawdown <= -35) {
+      setPhase("bust");
+      setPnl((b) => Number((b - stake).toFixed(6)));
+      setNearMiss("Rugged! −35% from entry.");
+      intervalRef.current && clearInterval(intervalRef.current);
+    }
+  }, [token.price, phase, entry, stake]);
+
+  function startRide() {
+    setNearMiss(null);
+    setEntry(token.price);
+    setPhase("riding");
+    setPlays((n) => n + 1);
+  }
+
+  function sell(reason: "user" | "time") {
+    if (phase !== "riding") return;
+    // multiplier based on current price vs entry
+    const grossMult = token.price / entry;
+    const netMult = Math.max(0, grossMult * 0.97); // house edge 3%
+    const payout = Number((stake * netMult).toFixed(6));
+    const delta = payout - stake;
+    setPnl((b) => Number((b + delta).toFixed(6)));
+    setPhase(netMult <= 0 ? "bust" : "won");
+    setNearMiss(
+      reason === "time" && grossMult > 1 ? "Auto-sold at time!" : null,
+    );
+    intervalRef.current && clearInterval(intervalRef.current);
+    // settle banner shows, then go back to idle
+    setTimeout(() => setPhase("settled"), 1200);
+  }
+
+  const currentMult = useMemo(() => token.price / entry, [token.price, entry]);
+  const currentNetMult = Math.max(0, currentMult * 0.97);
+
+  return (
+    <Card className="border-white/10 bg-white/5 text-white">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-sm text-white/70">
+          <span>Base Pulse — {token.symbol}</span>
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-white/60">Timer</div>
+            <div className="rounded-md bg-white/10 px-2 py-1 text-sm font-mono">
+              {phase === "riding" ? timer : "—"}
+            </div>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <BigTokenCard
+          token={token}
+          mult={currentNetMult}
+          drawdownPct={(token.price / entry - 1) * 100}
+        />
+
+        <div className="grid grid-cols-2 gap-2">
+          {phase === "riding" ? (
+            <>
+              <Button
+                className="h-12 w-full bg-[#0000FF] text-white hover:bg-[#0000E0]"
+                onClick={() => sell("user")}
+              >
+                <DollarSign className="mr-2 size-4" />
+                Sell
+              </Button>
+              <Button
+                variant="secondary"
+                className="h-12 w-full bg-white text-black hover:bg-white/90"
+                onClick={() => setPhase("idle")}
+              >
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                className="h-12 w-full bg-[#0000FF] text-white hover:bg-[#0000E0]"
+                onClick={startRide}
+              >
+                <Rocket className="mr-2 size-4" />
+                Start Ride
+              </Button>
+              <Button
+                variant="outline"
+                className="h-12 w-full border-white/15 bg-white/5 text-white hover:bg-white/10"
+                onClick={() => {
+                  setPhase("idle");
+                  setEntry(token.price);
+                }}
+              >
+                Reset
+              </Button>
+            </>
+          )}
+        </div>
+
+        <StakeControls value={stake} onChange={setStake} />
+
+        <Separator className="bg-white/10" />
+
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="text-white/70">
+            Session P&amp;L:{" "}
+            <span
+              className={cn(
+                "font-semibold",
+                pnl >= 0 ? "text-[#66C800]" : "text-[#FC401F]",
+              )}
+            >
+              {pnl >= 0 ? "+" : ""}
+              {pnl.toFixed(4)} ETH
+            </span>
+          </div>
+          <div className="text-white/60">Rounds: {plays}</div>
+        </div>
+
+        {nearMiss && (
+          <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-200">
+            {nearMiss}
+          </div>
+        )}
+
+        {phase === "bust" && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            Try again
+          </div>
+        )}
+        {phase === "won" && (
+          <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+            <PartyPopper className="mr-1 inline size-4" /> Legendary drop!
+            Payout: {(stake * currentNetMult).toFixed(6)} ETH
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BigTokenCard({
+  token,
   mult,
-  phase,
-  stake,
+  drawdownPct,
 }: {
+  token: Token;
   mult: number;
-  phase: Phase;
-  stake: number;
+  drawdownPct: number;
 }) {
   const color =
-    phase === "bust"
+    mult <= 0 || drawdownPct <= -35
       ? COLORS.red
-      : mult > 1
+      : mult >= 1
         ? COLORS.green
-        : phase === "spinning"
-          ? COLORS.cerulean
-          : "white";
+        : COLORS.cerulean;
+
   return (
-    <div className="flex items-center justify-center gap-3">
-      <div className="text-5xl font-extrabold tracking-tight" style={{ color }}>
-        {mult.toFixed(2)}x
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-white/5 to-white/0 p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className="size-10 rounded-md"
+            style={{ backgroundColor: token.color }}
+          />
+          <div>
+            <div className="text-lg font-bold text-white">{token.symbol}</div>
+            <div className="text-xs text-white/60">{token.name}</div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-sm text-white/60">Price</div>
+          <div className="text-lg font-semibold text-white">
+            {token.price.toFixed(4)}
+          </div>
+        </div>
       </div>
-      {mult >= 10 && phase !== "bust" && (
-        <span className="inline-flex items-center rounded-md bg-[#FFD12F]/15 px-2 py-1 text-sm font-semibold text-[#FFD12F]">
-          <PartyPopper className="mr-1 size-4" />
-          Legendary run
-        </span>
-      )}
-      <div className="ml-auto text-right text-sm text-white/60">
-        Stake
-        <div className="font-semibold text-white">{stake} ETH</div>
+
+      <div className="mt-6 flex items-end justify-between">
+        <div
+          className="text-6xl font-extrabold tracking-tight"
+          style={{ color }}
+        >
+          {mult.toFixed(2)}x
+        </div>
+        <div className="text-right">
+          <div
+            className={cn(
+              "text-sm font-semibold",
+              token.change5s >= 0 ? "text-[#66C800]" : "text-[#FC401F]",
+            )}
+          >
+            {token.change5s >= 0 ? "+" : ""}
+            {token.change5s.toFixed(2)}% / 5s
+          </div>
+          <div
+            className={cn(
+              "text-xs",
+              token.change1m >= 0 ? "text-[#66C800]" : "text-[#FC401F]",
+            )}
+          >
+            {token.change1m >= 0 ? "+" : ""}
+            {token.change1m.toFixed(1)}% / 1m
+          </div>
+        </div>
+      </div>
+
+      {/* Soft animated grid like memedeck */}
+      <div className="pointer-events-none absolute inset-0 -z-10 opacity-40">
+        <div
+          className="h-full w-full"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.08) 1px, transparent 1px)",
+            backgroundSize: "10px 10px",
+          }}
+        />
       </div>
     </div>
   );
 }
 
 function StakeControls({
-  stake,
+  value,
   onChange,
 }: {
-  stake: number;
+  value: number;
   onChange: (v: number) => void;
 }) {
-  const [val, setVal] = useState(stake);
-  useEffect(() => setVal(stake), [stake]);
+  const [val, setVal] = useState(value);
+  useEffect(() => setVal(value), [value]);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-sm text-white/70">
         <span>Stake</span>
-        <span>{stake} ETH</span>
+        <span>{value} ETH</span>
       </div>
       <Slider
         value={[val]}
-        onValueChange={(v) => setVal(v[0] ?? 0)}
-        onValueCommit={(v) => onChange(Number((v[0] ?? 0.001).toFixed(3)))}
+        onValueChange={(v) => setVal(v[0] ?? value)}
+        onValueCommit={(v) => onChange(Number((v[0] ?? value).toFixed(3)))}
         min={0.001}
         max={0.2}
         step={0.001}
@@ -439,7 +530,7 @@ function StakeControls({
             variant="outline"
             className={cn(
               "border-white/15 bg-white/5 text-white/80 hover:bg-white/10",
-              stake === p && "border-[#0000FF] text-white",
+              value === p && "border-[#0000FF] text-white",
             )}
             size="sm"
             onClick={() => onChange(p)}
@@ -452,344 +543,35 @@ function StakeControls({
   );
 }
 
-function LossLimit({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="flex items-center gap-2">
-      <span className="text-white/60">Loss limit</span>
-      <select
-        className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-white/80"
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      >
-        {[-0.05, -0.1, -0.25, -0.5, -1].map((o) => (
-          <option key={o} value={o}>
-            {o} ETH
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function LoseBar() {
-  return (
-    <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
-      Try again
-    </div>
-  );
-}
-
-function WinBar({ payout }: { payout: number }) {
-  return (
-    <div className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-200">
-      Legendary drop! Payout: {payout.toFixed(6)} ETH
-    </div>
-  );
-}
-
-function BreakNotice({
-  dismiss,
-  plays,
-}: {
-  dismiss: () => void;
-  plays: number;
-}) {
-  return (
-    <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-100">
-      <div className="font-semibold">Take a break</div>
-      <p className="mt-1">
-        You’ve played {plays} rounds. Consider a short pause.
-      </p>
-      <div className="mt-2">
-        <Button
-          size="sm"
-          className="bg-white text-black hover:bg-white/90"
-          onClick={dismiss}
-        >
-          Continue
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function Badge({ label, color }: { label: string; color: "info" | "neutral" }) {
-  const styles =
-    color === "info"
-      ? "bg-[#3C8AFF]/20 text-[#a8c9ff]"
-      : "bg-white/10 text-white/70";
-  return (
-    <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", styles)}>
-      {label}
-    </span>
-  );
-}
-
-/**
- * OrbitalLockCanvas
- * - Large circular arena with rotating pointer and a shrinking/moving safe arc.
- * - Press "Lock" (or Space) to check if the pointer is inside the arc.
- * - On success: multiplier increases and arc shrinks; on miss: bust.
- */
-function OrbitalLockCanvas({
-  phase,
-  setPhase,
-  round,
-  setRound,
-  mult,
-  setMult,
-  onOutcome,
-}: {
-  phase: Phase;
-  setPhase: (p: Phase) => void;
-  round: number;
-  setRound: (r: number) => void;
-  mult: number;
-  setMult: (m: number) => void;
-  onOutcome: (o: "success" | "bust" | "near") => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const reqRef = useRef<number | null>(null);
-  const angleRef = useRef(0); // radians
-  const speedRef = useRef(2.8); // rad/s
-  const arcCenterRef = useRef(Math.PI / 2); // radians
-  const arcSizeRef = useRef(Math.PI * 0.7); // radians (initial safe arc ~126deg)
-  const lastTsRef = useRef<number | null>(null);
-
-  // Initialize listeners for "Lock"
-  useEffect(() => {
-    const onLock = () => {
-      if (phase !== "spinning") return;
-      const ang = norm(angleRef.current);
-      const c = norm(arcCenterRef.current);
-      const half = arcSizeRef.current / 2;
-      const diff = smallestDiff(ang, c);
-      const inside = Math.abs(diff) <= half;
-      const near = Math.abs(Math.abs(diff) - half) < (Math.PI / 180) * 4; // within 4deg is near-miss
-      if (inside) {
-        // Success: increase multiplier and shrink/move the arc, randomize speed
-        const addFactor = growthForArc(arcSizeRef.current);
-        const nextMult = Number((mult * addFactor).toFixed(4));
-        setMult(nextMult);
-        // visual difficulty increase
-        arcSizeRef.current = Math.max(
-          arcSizeRef.current * 0.8,
-          (Math.PI / 180) * 12,
-        ); // min 12deg
-        arcCenterRef.current = Math.random() * Math.PI * 2;
-        speedRef.current = 2.0 + Math.random() * 4.0;
-        setRound(round + 1);
-        onOutcome("success");
-        // continue spinning
-      } else {
-        setPhase("bust");
-        onOutcome(near ? "near" : "bust");
-      }
-    };
-    document.addEventListener("orbital-lock", onLock);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
-        e.preventDefault();
-        onLock();
-      }
-      if (e.key.toLowerCase() === "c") {
-        e.preventDefault();
-        // Cash out handled in parent via button; we only support Lock here
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("orbital-lock", onLock);
-      window.removeEventListener("keydown", onKey);
-    };
-  }, [phase, mult, round, setMult, setRound, onOutcome, setPhase]);
-
-  // Start/stop animation loop when phase changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: yolo
-  useEffect(() => {
-    if (phase !== "spinning") {
-      if (reqRef.current) cancelAnimationFrame(reqRef.current);
-      reqRef.current = null;
-      lastTsRef.current = null;
-      return;
-    }
-    const loop = (ts: number) => {
-      if (lastTsRef.current == null) lastTsRef.current = ts;
-      const dt = (ts - lastTsRef.current) / 1000;
-      lastTsRef.current = ts;
-      angleRef.current += speedRef.current * dt;
-      draw();
-      reqRef.current = requestAnimationFrame(loop);
-    };
-    reqRef.current = requestAnimationFrame(loop);
-    return () => {
-      if (reqRef.current) cancelAnimationFrame(reqRef.current);
-      reqRef.current = null;
-    };
-  }, [phase]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: yolo
-  useEffect(() => {
-    draw();
-  }, []);
-
-  function draw() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const rect = canvas.getBoundingClientRect();
-    const size = Math.min(rect.width, 420);
-    canvas.width = size * dpr;
-    canvas.height = size * dpr;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, size, size);
-
-    const R = size * 0.42;
-    const cx = size / 2;
-    const cy = size / 2;
-
-    // Backdrop
-    ctx.fillStyle = "rgba(255,255,255,0.04)";
-    ctx.beginPath();
-    ctx.arc(cx, cy, R + 16, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Safe arc
-    const c = arcCenterRef.current;
-    const half = arcSizeRef.current / 2;
-    const start = c - half;
-    const end = c + half;
-    const grad = ctx.createLinearGradient(cx - R, cy, cx + R, cy);
-    grad.addColorStop(0, "rgba(0,0,255,0.3)");
-    grad.addColorStop(1, "rgba(60,138,255,0.5)");
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 14;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, start, end, false);
-    ctx.stroke();
-
-    // Outer ring
-    ctx.strokeStyle = "rgba(255,255,255,0.12)";
-    ctx.lineWidth = 10;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Pointer
-    const ang = angleRef.current;
-    const px = cx + Math.cos(ang) * (R + 2);
-    const py = cy + Math.sin(ang) * (R + 2);
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(px, py);
-    ctx.stroke();
-
-    // Glow when pointer inside
-    const inside = Math.abs(smallestDiff(norm(ang), norm(c))) <= half;
-    if (inside) {
-      ctx.shadowBlur = 24;
-      ctx.shadowColor = COLORS.baseBlue;
-      ctx.strokeStyle = COLORS.baseBlue;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(px, py);
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
-
-    // Center text
-    ctx.fillStyle = "rgba(255,255,255,0.6)";
-    ctx.font = "12px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Press Lock in the blue window", cx, cy + R + 24);
-  }
-
-  // Update multiplier growth textually handled upstream; here we just compute and return via setMult on success
-  // growthForArc returns multiplicative factor per success
-  return (
-    <div className="relative mx-auto mt-1 flex w-full flex-col items-center">
-      <canvas
-        ref={canvasRef}
-        className="aspect-square w-full max-w-sm touch-manipulation rounded-xl"
-      />
-      <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs text-white/60">
-        <Kpi
-          label="Arc"
-          value={`${Math.round((arcSizeRef.current * 180) / Math.PI)}°`}
-        />
-        <Kpi label="Speed" value={`${speedRef.current.toFixed(1)} rad/s`} />
-        <Kpi label="Round" value={round || "—"} />
-      </div>
-      {/* Auto-advance: when in spinning and user succeeds, parent keeps spinning.
-          Cash out is in parent controls. */}
-    </div>
-  );
-}
-
-function Kpi({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-md border border-white/10 bg-white/5 px-2 py-1">
-      <div className="text-[10px] uppercase tracking-wide text-white/50">
-        {label}
-      </div>
-      <div className="text-sm font-semibold text-white">{value}</div>
-    </div>
-  );
-}
-
-function growthForArc(arcRad: number) {
-  // Map arc size to growth factor. Smaller arc => bigger factor.
-  // 180deg => +20%, 90deg => +40%, 45deg => +75%, 20deg => +120%
-  const deg = (arcRad * 180) / Math.PI;
-  const add = 0.2 * (180 / Math.max(deg, 12)); // scale
-  return 1 + Math.min(add, 1.2);
-}
-
-function norm(a: number) {
-  const two = Math.PI * 2;
-  return ((a % two) + two) % two;
-}
-function smallestDiff(a: number, b: number) {
-  const two = Math.PI * 2;
-  let d = a - b;
-  d = ((d + Math.PI) % two) - Math.PI;
-  return d;
-}
-
 function BottomDock() {
+  const [autoSell, setAutoSell] = useState(true);
+  const [limit, setLimit] = useState(10);
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-black/50 backdrop-blur">
-      <div className="mx-auto flex max-w-screen-md items-center gap-2 px-3 py-2">
+      <div className="mx-auto flex max-w-screen-lg items-center gap-3 px-3 py-2">
         <Button
           size="icon"
           variant="ghost"
           className="text-white/80 hover:text-white"
-          title="Stats"
         >
           <Coins className="size-5" />
         </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="text-white/80 hover:text-white"
-          title="Timer"
-        >
-          <Timer className="size-5" />
-        </Button>
-        <div className="ml-auto text-xs text-white/50">
-          Always onchain. Built on Base.
+        <div className="text-xs text-white/60">
+          Instant onchain loot. Built on Base.
+        </div>
+        <div className="ml-auto flex items-center gap-3 text-xs text-white/70">
+          <label className="flex items-center gap-2" htmlFor="auto-sell">
+            <Switch checked={autoSell} onCheckedChange={setAutoSell} />
+            Auto-sell at +{limit}%
+          </label>
+          <input
+            type="number"
+            value={limit}
+            min={2}
+            max={200}
+            className="w-16 rounded-md border border-white/15 bg-white/5 px-2 py-1 text-white"
+            onChange={(e) => setLimit(Number(e.target.value))}
+          />
         </div>
       </div>
     </div>
