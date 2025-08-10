@@ -1,16 +1,11 @@
 "use client";
 
 import { Crown, Rocket, Shield, Swords, TrendingUp, Zap } from "lucide-react";
-import Link from "next/link";
 import type React from "react";
+import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import WalletConnect from "@/components/WalletConnect";
-
-const COLORS = {
-  baseBlue: "#0000FF",
-  bg: "#0A0B0D",
-};
+import { COLORS } from "@/lib/utils";
 
 export default function Home() {
   return (
@@ -23,34 +18,6 @@ export default function Home() {
       </div>
       <FooterDock />
     </main>
-  );
-}
-
-function Header() {
-  return (
-    <header className="mb-6 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div
-          aria-hidden
-          className="grid size-7 grid-cols-2 gap-0.5 rounded-sm"
-          style={{ filter: "drop-shadow(0 0 12px #0000FF)" }}
-        >
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-sm"
-              style={{ backgroundColor: COLORS.baseBlue }}
-            />
-          ))}
-        </div>
-        <span className="text-lg font-semibold tracking-wide text-white/90">
-          L00T.fun
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <WalletConnect className="z-10" />
-      </div>
-    </header>
   );
 }
 
@@ -67,19 +34,19 @@ function Hero() {
             and tactile. Play a demo or connect a wallet to start looting.
           </p>
           <div className="mt-4 flex gap-2">
-            <Link href="#games">
+            <a href="#games">
               <Button className="bg-[#0000FF] text-white hover:bg-[#0000E0]">
                 Choose a game
               </Button>
-            </Link>
-            <Link href="/games/dungeon">
+            </a>
+            <a href="/games/dungeon">
               <Button
                 variant="secondary"
                 className="bg-white text-black hover:bg-white/90"
               >
                 Play Dungeon demo
               </Button>
-            </Link>
+            </a>
           </div>
           <div className="mt-3 flex items-center gap-2 text-xs text-white/50">
             <Shield className="size-4" />
@@ -165,7 +132,7 @@ function Step({
           className="border-white/15 bg-white/5 text-white hover:bg-white/10"
         >
           {href ? (
-            <Link href={href}>{cta}</Link>
+            <a href={href}>{cta}</a>
           ) : (
             <span className="pointer-events-none">{cta}</span>
           )}
@@ -259,19 +226,19 @@ function GameCard({
         />
         <p className="mt-3 text-sm text-white/70">{desc}</p>
         <div className="mt-3 flex gap-2">
-          <Link href={href}>
+          <a href={href}>
             <Button className="bg-[#0000FF] text-white hover:bg-[#0000E0]">
               Play
             </Button>
-          </Link>
-          <Link href={href}>
+          </a>
+          <a href={href}>
             <Button
               variant="secondary"
               className="bg-white text-black hover:bg-white/90"
             >
               Demo
             </Button>
-          </Link>
+          </a>
         </div>
       </CardContent>
     </Card>

@@ -2,17 +2,15 @@
 
 import {
   Coins,
-  HelpCircle,
   PartyPopper,
   Rocket,
   RotateCw,
   Swords,
   Timer,
   Trophy,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Header } from "@/components/header";
 import {
   Accordion,
   AccordionContent,
@@ -22,16 +20,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import WalletConnect from "@/components/WalletConnect";
 import { cn } from "@/lib/utils";
 
 type Phase = "idle" | "spinning" | "bust" | "won";
@@ -49,67 +44,12 @@ export default function Page() {
   return (
     <main className="min-h-dvh w-full" style={{ backgroundColor: COLORS.bg }}>
       <div className="mx-auto max-w-screen-md px-3 pb-28 pt-3 sm:pt-6">
-        <Header />
+        <Header howToPlay={<HowToPlay />} />
         <Ticker />
         <Game />
       </div>
       <BottomDock />
     </main>
-  );
-}
-
-function Header() {
-  const [muted, setMuted] = useState(true);
-  return (
-    <header className="mb-3 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div
-          aria-hidden
-          className="grid size-7 grid-cols-2 gap-0.5 rounded-sm"
-          style={{ filter: `drop-shadow(0 0 12px ${COLORS.baseBlue})` }}
-        >
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-sm"
-              style={{ backgroundColor: COLORS.baseBlue }}
-            />
-          ))}
-        </div>
-        <span className="text-lg font-semibold tracking-wide text-white/90">
-          L00T.fun
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="border-white/15 bg-white/5 text-white hover:bg-white/10 px-2 sm:px-3"
-              aria-label="How it works"
-            >
-              <HelpCircle className="size-4" />
-              <span className="ml-2 hidden sm:inline">How it works</span>
-            </Button>
-          </DialogTrigger>
-          <HowToPlay />
-        </Dialog>
-        <WalletConnect className="z-10" />
-        <Button
-          size="icon"
-          variant="outline"
-          className="border-white/15 bg-white/5 text-white/80 hover:text-white"
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? (
-            <VolumeX className="size-4" />
-          ) : (
-            <Volume2 className="size-4" />
-          )}
-        </Button>
-      </div>
-    </header>
   );
 }
 

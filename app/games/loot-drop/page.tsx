@@ -6,19 +6,29 @@ import {
   PartyPopper,
   Play,
   Repeat2,
-  Settings,
   Trophy,
   Volume2,
   VolumeX,
   Zap,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Header } from "@/components/header";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import WalletConnect from "@/components/WalletConnect";
 import { cn } from "@/lib/utils";
 
 type Result = {
@@ -47,41 +57,11 @@ export default function Page() {
   return (
     <main className="min-h-dvh w-full" style={{ backgroundColor: COLORS.bg }}>
       <div className="mx-auto max-w-screen-md px-3 pb-28 pt-3 sm:pt-6">
-        <Header />
+        <Header howToPlay={<HowToPlay />} />
         <GameShell />
       </div>
       <BottomControlsDock />
     </main>
-  );
-}
-
-function Header() {
-  return (
-    <header className="mb-3 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div
-          aria-hidden
-          className="size-7 rounded-sm"
-          style={{
-            backgroundColor: COLORS.baseBlue,
-            boxShadow: `0 0 16px ${COLORS.baseBlue}`,
-          }}
-        />
-        <span className="text-lg font-semibold tracking-wide text-white/90">
-          L00T.fun
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <WalletConnect className="z-10" />
-        <Button
-          size="icon"
-          variant="outline"
-          className="border-white/10 text-white/80 bg-white/5 hover:bg-white/10"
-        >
-          <Settings className="size-4" />
-        </Button>
-      </div>
-    </header>
   );
 }
 
@@ -998,5 +978,52 @@ function ControlStepper({
         +
       </button>
     </div>
+  );
+}
+
+function HowToPlay() {
+  return (
+    <DialogContent className="max-w-md border-white/10 bg-black text-white">
+      <DialogHeader>
+        <DialogTitle className="text-center text-xl">
+          How to Play — Loot Drop
+        </DialogTitle>
+      </DialogHeader>
+      <ol className="list-decimal space-y-2 pl-5 text-sm text-[#c0f28a]">
+        <li>Place your stake in ETH</li>
+        <li>Tap Open Loot to charge up the chest</li>
+        <li>Wait for the charge bar to reach 100%</li>
+        <li>Reveal your multiplier from 0.1x to 100x</li>
+        <li>Legendary drops (20x+) sparkle with gold</li>
+        <li>Use Repeat to instantly play again</li>
+      </ol>
+      <Accordion type="single" collapsible className="mt-3">
+        <AccordionItem value="fair">
+          <AccordionTrigger className="text-sm">Provably Fair</AccordionTrigger>
+          <AccordionContent className="text-sm text-white/70">
+            Results will be generated on Base using verifiable randomness. Demo
+            uses client simulation. House edge 3%.
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="multipliers">
+          <AccordionTrigger className="text-sm">
+            Multiplier Ranges
+          </AccordionTrigger>
+          <AccordionContent className="text-sm text-white/70">
+            Common: 1.0x-2.0x, Rare: 2.0x-5.0x, Epic: 5.0x-20.0x, Legendary:
+            20.0x-100.0x. Hot streaks and combo bonuses apply.
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="responsible">
+          <AccordionTrigger className="text-sm">
+            Responsible Gaming
+          </AccordionTrigger>
+          <AccordionContent className="text-sm text-white/70">
+            Set max loss limits, session reminders, and self-exclusion in
+            Settings. Take breaks every 50 rounds.
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </DialogContent>
   );
 }

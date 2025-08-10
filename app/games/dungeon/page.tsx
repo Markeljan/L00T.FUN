@@ -10,16 +10,9 @@ import {
   Shield,
   Skull,
   Swords,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -32,7 +25,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import WalletConnect from "@/components/WalletConnect";
 import { cn } from "@/lib/utils";
 
 // Palette — Base
@@ -73,11 +65,78 @@ type LeaderRow = { name: string; pnl: number };
 
 const HOUSE_EDGE = 0.95; // 5%
 
+function HowToPlay() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-white/60 hover:text-white"
+        >
+          <HelpCircle className="size-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md border-white/10 bg-black/90 text-white">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <Shield className="size-5" />
+            How to Play Dungeon
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 text-sm text-white/80">
+          <div>
+            <h4 className="mb-2 font-semibold text-white">Objective</h4>
+            <p>
+              Navigate through dungeon levels by choosing doors. Avoid traps to
+              advance and multiply your stake!
+            </p>
+          </div>
+
+          <div>
+            <h4 className="mb-2 font-semibold text-white">Gameplay</h4>
+            <ul className="space-y-1 text-xs">
+              <li>• Each level has multiple doors - only one is safe</li>
+              <li>• Choose a door to advance to the next level</li>
+              <li>• Hit a trap and you lose your stake</li>
+              <li>• Survive and your multiplier increases</li>
+              <li>• Cash out anytime to secure your winnings</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="mb-2 font-semibold text-white">Multipliers</h4>
+            <p className="text-xs">
+              Each safe door multiplies your stake by the row base multiplier.
+              The deeper you go, the higher the reward!
+            </p>
+          </div>
+
+          <div>
+            <h4 className="mb-2 font-semibold text-white">House Edge</h4>
+            <p className="text-xs">
+              5% house edge applied to all payouts. This ensures the game
+              remains sustainable.
+            </p>
+          </div>
+
+          <div className="pt-2 text-xs text-white/60">
+            <p>
+              🎯 <strong>Tip:</strong> Start with small stakes and learn the
+              patterns!
+            </p>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Page() {
   return (
     <main className="min-h-dvh w-full" style={{ backgroundColor: COLORS.bg }}>
       <div className="mx-auto max-w-screen-lg px-3 pb-28 pt-3 sm:pt-6">
-        <Header />
+        <Header howToPlay={<HowToPlay />} />
         <div className="grid gap-4 md:grid-cols-[1fr_320px]">
           <DungeonGame />
           <RightRail />
@@ -85,114 +144,6 @@ export default function Page() {
       </div>
       <BottomDock />
     </main>
-  );
-}
-
-function Header() {
-  const [muted, setMuted] = useState(true);
-  return (
-    <header className="mb-3 flex items-center justify-between">
-      {/* Basemark as crest */}
-      <div className="flex items-center gap-2">
-        <div
-          className="grid size-7 grid-cols-2 gap-0.5 rounded-sm"
-          style={{ filter: `drop-shadow(0 0 16px ${COLORS.baseBlue})` }}
-        >
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-sm"
-              style={{ backgroundColor: COLORS.baseBlue }}
-            />
-          ))}
-        </div>
-        <span className="text-lg font-semibold tracking-wide text-white/90">
-          L00T.fun
-        </span>
-      </div>
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="border-white/15 bg-white/5 text-white hover:bg-white/10 px-2 sm:px-3"
-              aria-label="How it works"
-            >
-              <HelpCircle className="size-4" />
-              <span className="ml-2 hidden sm:inline">How it works</span>
-            </Button>
-          </DialogTrigger>
-          <HowToPlay />
-        </Dialog>
-        <WalletConnect className="z-10" />
-        <Button
-          size="icon"
-          variant="outline"
-          className="border-white/15 bg-white/5 text-white/80 hover:text-white"
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? (
-            <VolumeX className="size-4" />
-          ) : (
-            <Volume2 className="size-4" />
-          )}
-        </Button>
-      </div>
-    </header>
-  );
-}
-
-function HowToPlay() {
-  return (
-    <DialogContent className="max-w-md border-white/10 bg-black text-white">
-      <DialogHeader>
-        <DialogTitle className="text-center text-xl">
-          How to Play — Dungeon Gauntlet
-        </DialogTitle>
-      </DialogHeader>
-
-      <ol className="list-decimal space-y-2 pl-5 text-sm text-[#c0f28a]">
-        <li>Place your stake (ETH), choose number of doors per level</li>
-        <li>Each level has exactly one deadly trap behind a door</li>
-        <li>
-          Pick a door to advance; survive to increase your payout multiplier
-        </li>
-        <li>Cash out anytime to escape the dungeon with your loot</li>
-        <li>If you hit the trap, you bust to 0</li>
-      </ol>
-
-      <Accordion type="single" collapsible className="mt-3">
-        <AccordionItem value="math">
-          <AccordionTrigger className="text-sm">
-            Exact Multiplier Math
-          </AccordionTrigger>
-          <AccordionContent className="text-sm text-white/70">
-            Base per level = 1 / (1 − death_probability). With N doors,
-            death_probability = 1/N. Example (5 doors): Base = 1 / (1 − 0.2) =
-            1.25x. Your total multiplier compounds each level. Cash-out applies
-            a 5% house edge: Total × 0.95.
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="fair">
-          <AccordionTrigger className="text-sm">Provably Fair</AccordionTrigger>
-          <AccordionContent className="text-sm text-white/70">
-            This demo uses client simulation. On Base mainnet, trap locations
-            per level will be derived from verifiable randomness. Settlements
-            occur instantly onchain.
-          </AccordionContent>
-        </AccordionItem>
-        <AccordionItem value="responsible">
-          <AccordionTrigger className="text-sm">
-            Responsible Gaming
-          </AccordionTrigger>
-          <AccordionContent className="text-sm text-white/70">
-            Max loss limits, break reminders, and self-exclusion options
-            available. A reminder shows after 50 levels.
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
-    </DialogContent>
   );
 }
 
