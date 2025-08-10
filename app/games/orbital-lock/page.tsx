@@ -80,15 +80,16 @@ function Header() {
           L00T.fun
         </span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <Dialog>
           <DialogTrigger asChild>
             <Button
               variant="outline"
-              className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+              className="border-white/15 bg-white/5 text-white hover:bg-white/10 px-2 sm:px-3"
+              aria-label="How it works"
             >
-              <HelpCircle className="mr-2 size-4" />
-              How it works
+              <HelpCircle className="size-4" />
+              <span className="ml-2 hidden sm:inline">How it works</span>
             </Button>
           </DialogTrigger>
           <HowToPlay />
