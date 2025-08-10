@@ -2,6 +2,7 @@
 
 import { Crown, Rocket, Shield, Swords, TrendingUp, Zap } from "lucide-react";
 import type React from "react";
+import ApplePayOnramp from "@/components/apple-pay-onramp";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +26,7 @@ function Hero() {
   return (
     <section className="mb-6 overflow-hidden rounded-2xl border border-white/10 bg-white/5">
       <div className="grid gap-6 p-6 md:grid-cols-2">
-        <div>
+        <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold text-white">
             Instant onchain loot. Built on Base.
           </h1>
@@ -48,19 +49,20 @@ function Hero() {
               </Button>
             </a>
           </div>
-          <div className="mt-3 flex items-center gap-2 text-xs text-white/50">
+          <div className="my-3 flex items-center gap-2 text-xs text-white/50">
             <Shield className="size-4" />
             <span>
               Provably fair coming soon on Base • Transparent house edge per
               game
             </span>
           </div>
+          <ApplePayOnramp />
         </div>
-        <div className="relative">
+        <div className="relative max-sm:hidden">
           <img
             src="/neon-blue-grid.png"
             alt="Abstract Base themed grid"
-            className="h-48 w-full rounded-lg object-cover"
+            className="h-48 w-full rounded-lg object-cover md:h-full"
           />
         </div>
       </div>

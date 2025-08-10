@@ -30,10 +30,20 @@ const WalletConnect: FC<WalletConnectProps> = ({ className }) => {
 
   return (
     <OckWallet className={wrapperClass}>
-      <ConnectWallet>
-        <Name className="text-inherit truncate max-w-[6.5rem] sm:max-w-none" />
+      <ConnectWallet className="bg-[#0000FF]">
+        <Name className="text-white truncate max-w-[6.5rem] sm:max-w-none" />
       </ConnectWallet>
-      <WalletDropdown>
+      <WalletDropdown
+        classNames={{
+          container: "bg-[#0000FF]",
+          swap: {
+            container: "bg-[#0000FF]",
+          },
+          qr: {
+            container: "bg-[#0000FF]",
+          },
+        }}
+      >
         <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
           <Avatar />
           <Name />

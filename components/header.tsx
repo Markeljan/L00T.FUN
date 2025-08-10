@@ -30,19 +30,21 @@ export const Header = ({ howToPlay }: { howToPlay?: React.ReactNode }) => {
         </span>
       </a>
       <div className="flex items-center gap-1.5 sm:gap-2">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="border-white/15 bg-white/5 text-white hover:bg-white/10 px-2 sm:px-3"
-              aria-label="How it works"
-            >
-              <HelpCircle className="size-4" />
-              <span className="ml-2 hidden sm:inline">How it works</span>
-            </Button>
-          </DialogTrigger>
-          {howToPlay}
-        </Dialog>
+        {howToPlay ? (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="border-white/15 bg-white/5 text-white hover:bg-white/10 px-2 sm:px-3"
+                aria-label="How it works"
+              >
+                <HelpCircle className="size-4" />
+                <span className="ml-2 hidden sm:inline">How it works</span>
+              </Button>
+            </DialogTrigger>
+            {howToPlay}
+          </Dialog>
+        ) : null}
         <WalletConnect className="z-10" />
         <Button
           size="icon"
